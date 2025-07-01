@@ -244,16 +244,16 @@ tbody tr:hover {
 }
 </style>
 
-<h2>$ Không Short, Không Long, Đời Không Nể $<br>Không Cháy Vài Lần Khó Thành Công</h2>
+<h2>$ Binance AutoTrade Analyzer $</h2>
 
 <select id="positionSelect">
   <option value="long">Long</option>
   <option value="short">Short</option>
 </select>
 
-<input type="text" id="searchInput" placeholder="Tìm kiếm cặp USDT..." />
-<button onclick="location.reload()" class="neon-btn">🔄 Reload Trang</button>
-
+<input type="text" id="searchInput" placeholder="Search..." />
+<button onclick="location.reload()" class="neon-btn">🔄 Reload</button>
+<button onclick="window.location.href='earn.html'" class="neon-btn">💸 Earn Money</button>
 <style>
   .neon-btn {
     background-color: #1e1e2f;         /* nền tím đậm */
@@ -283,19 +283,19 @@ tbody tr:hover {
 </style>
 
 
-<div id="loading">Đợi tí đi anh zaii...</div>
+<div id="loading">Wait a second bro...</div>
 <div class="table-wrapper">
 <table id="coinTable" style="display:none;">
   <thead>
     <tr>
       <th data-key="symbol">Coin ▲▼</th>
-      <th data-key="priceChangePercent">Giá hiện tại ▲▼</th>
+      <th data-key="priceChangePercent">Current Price ▲▼</th>
       <th data-key="volume">Vol 24h ▲▼</th>
       <th data-key="winRate">Win Rate(%) ▲▼</th>
-      <th>TP (Giá)</th>
-      <th>SL (Giá)</th>
-      <th>% Lãi</th>
-      <th>% Lỗ</th>
+      <th>Take Profit</th>
+      <th>Stop Loss</th>
+      <th>% Profit</th>
+      <th>% Loss</th>
     </tr>
   </thead>
   <tbody></tbody>
