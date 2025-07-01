@@ -24,6 +24,31 @@
 <script src="https://cdn.jsdelivr.net/npm/technicalindicators@3.1.0/dist/browser.js"></script>
 
 <style>
+  /* Làm cho bảng cuộn ngang nếu tràn màn hình */
+  .table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px; /* Giúp giữ định dạng khi hiển thị nhiều cột */
+  }
+
+  th, td {
+    padding: 8px;
+    text-align: center;
+    white-space: nowrap; /* Không cho xuống dòng */
+  }
+
+  /* Tự co chữ trên thiết bị nhỏ */
+  @media (max-width: 768px) {
+    th, td {
+      font-size: 12px;
+      padding: 4px;
+    }
+  }
 /* Giao diện Dark mode chuyên trading style */
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -173,13 +198,6 @@ td {
   font-style: italic;
 }
 
-/* Scrollbar cho table đẹp hơn */
-tbody {
-  max-height: 500px;
-  overflow-y: auto;
-  display: block;
-}
-
 thead, tbody tr {
   display: table;
   width: 100%;
@@ -266,7 +284,7 @@ tbody tr:hover {
 
 
 <div id="loading">Đợi tí đi anh zaii...</div>
-
+<div class="table-wrapper">
 <table id="coinTable" style="display:none;">
   <thead>
     <tr>
@@ -281,7 +299,7 @@ tbody tr:hover {
     </tr>
   </thead>
   <tbody></tbody>
-</table>
+</table></div>
 
 <script>
 let dataTable = [];
