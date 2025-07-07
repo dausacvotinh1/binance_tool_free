@@ -513,8 +513,8 @@ function calcTech(closes, position, lastCandle, volumes = [], klines = []) {
     SimpleMASignal: false,
   };
   const macdArr = window.MACD.calculate(macdInput);
-  const macdLast = macdArr.length ? macdArr.pop() : null;
-  const macdPrev = macdArr.length ? macdArr[macdArr.length - 1] : null;
+  const macdLast = macdArr.at(-1);
+  const macdPrev = macdArr.at(-2);
 
   const bbInput = {
     period: 20,
@@ -526,68 +526,69 @@ function calcTech(closes, position, lastCandle, volumes = [], klines = []) {
   const bbPrev = bbArr.at(-2);
 
   const lastClose = closes.at(-1);
-
   let winRate = 50;
 
-  if (volumes.length > 20) {
-    const recentVol = volumes.at(-1);
-    const avgVol = volumes.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
-    if (recentVol > avgVol * 1.5) winRate += 10;
-    else if (recentVol < avgVol * 0.5) winRate -= 5;
-  }
+  // 🔹 EMA: xu hướng
+  if (ema20 > ema50) winRate += (position === 'long') ? 8 : -8;
+  else if (ema20 < ema50) winRate += (position === 'short') ? 8 : -8;
 
-  if (ema20 > ema50) winRate += (position === 'long') ? 10 : -10;
-  else if (ema20 < ema50) winRate += (position === 'short') ? 10 : -10;
-
+  // 🔹 MACD: xung lực
   if (macdLast && macdPrev) {
-    const macdHistNow = macdLast.histogram;
-    const macdHistPrev = macdPrev.histogram;
+    const histNow = macdLast.histogram;
+    const histPrev = macdPrev.histogram;
     const macdLine = macdLast.MACD;
     const signalLine = macdLast.signal;
 
-    if (macdHistNow > 0 && macdHistNow > macdHistPrev) winRate += 8;
-    else if (macdHistNow > 0 && macdHistNow < macdHistPrev) winRate += 4;
-    else if (macdHistNow < 0 && macdHistNow < macdHistPrev) winRate -= 8;
-    else if (macdHistNow < 0 && macdHistNow > macdHistPrev) winRate -= 4;
-
-    if (macdLine > signalLine && macdHistNow > 0) winRate += 6;
-    else if (macdLine < signalLine && macdHistNow < 0) winRate -= 6;
+    if (macdLine > signalLine && histNow > histPrev && histNow > 0) {
+      winRate += 6;
+    } else if (macdLine < signalLine && histNow < histPrev && histNow < 0) {
+      winRate -= 6;
+    }
   }
 
+  // 🔹 RSI: vùng quá mua/bán & xu hướng RSI
+  winRate += evaluateRSIImpact(rsi, prevRsi, position);
+
+  // 🔹 Bollinger Bands: breakout hoặc fail breakout
   if (bbLast && bbPrev) {
     const bbWidth = bbLast.upper - bbLast.lower;
     const prevWidth = bbPrev.upper - bbPrev.lower;
     const widthChange = (bbWidth - prevWidth) / prevWidth;
     const slope = bbLast.upper - bbPrev.upper;
 
-    const upperThreshold = bbLast.upper * 1.05;
-    const extremeUpper = bbLast.upper * 1.15;
-    const lowerThreshold = bbLast.lower * 0.95;
-    const extremeLower = bbLast.lower * 0.85;
-
     const isExpanding = widthChange > 0.1;
     const isContracting = widthChange < -0.1;
 
     if (isExpanding) {
-      if (position === 'long' && slope < 0) winRate -= 15;
-      else if (position === 'short' && slope > 0) winRate -= 15;
-      else winRate += 5;
+      if ((position === 'long' && slope < 0) || (position === 'short' && slope > 0)) {
+        winRate -= 10;
+      } else {
+        winRate += 4;
+      }
     }
 
-    if (isContracting) winRate -= 5;
+    if (isContracting) winRate -= 3;
 
-    if (position === 'long') {
-      if (lastClose <= upperThreshold && lastClose >= bbLast.upper) winRate += 10;
-      else if (lastClose > extremeUpper) winRate -= 10;
-    } else if (position === 'short') {
-      if (lastClose >= lowerThreshold && lastClose <= bbLast.lower) winRate += 10;
-      else if (lastClose < extremeLower) winRate -= 10;
+    // Giao dịch quanh vùng band
+    if (position === 'long' && lastClose >= bbLast.lower && lastClose <= bbLast.lower * 1.05) {
+      winRate += 6;
+    }
+    if (position === 'short' && lastClose <= bbLast.upper && lastClose >= bbLast.upper * 0.95) {
+      winRate += 6;
     }
   }
 
-  const rsiImpact = evaluateRSIImpact(rsi, prevRsi, position);
-  winRate += rsiImpact;
+  // 🔹 Volume: xác nhận breakout hoặc momentum
+  if (volumes.length > 20) {
+    const recentVol = volumes.at(-1);
+    const avgVol = volumes.slice(-21, -1).reduce((a, b) => a + b, 0) / 20;
+    const volStrength = recentVol / avgVol;
 
+    if (volStrength >= 1.5) winRate += 4;
+    else if (volStrength <= 0.5) winRate -= 3;
+  }
+
+  // 🔹 Simple Candle Pattern
   if (lastCandle) {
     const open = parseFloat(lastCandle[1]);
     const high = parseFloat(lastCandle[2]);
@@ -596,41 +597,43 @@ function calcTech(closes, position, lastCandle, volumes = [], klines = []) {
     const pattern = detectCandlePattern(open, high, low, close);
 
     if (position === 'long') {
-      if (pattern === 'Hammer') winRate += 10;
-      if (pattern === 'ShootingStar') winRate -= 10;
+      if (pattern === 'Hammer' && rsi < 40) winRate += 6;
+      if (pattern === 'ShootingStar') winRate -= 6;
     } else if (position === 'short') {
-      if (pattern === 'ShootingStar') winRate += 10;
-      if (pattern === 'Hammer') winRate -= 10;
+      if (pattern === 'ShootingStar' && rsi > 60) winRate += 6;
+      if (pattern === 'Hammer') winRate -= 6;
     }
 
-    if (pattern === 'Doji') winRate -= 5;
+    if (pattern === 'Doji') winRate -= 3;
   }
-  // 📌 Mô hình nến nâng cao (Engulfing, Star)
+
+  // 🔹 Advanced Candlestick Pattern
   if (klines.length >= 3) {
     const advPattern = detectAdvancedCandlePattern(klines);
 
     if (position === 'long') {
-      if (advPattern === 'BullishEngulfing') winRate += 12;
-      if (advPattern === 'BearishEngulfing') winRate -= 12;
-      if (advPattern === 'MorningStar') winRate += 15;
-      if (advPattern === 'EveningStar') winRate -= 15;
+      if (advPattern === 'BullishEngulfing') winRate += 10;
+      if (advPattern === 'BearishEngulfing') winRate -= 10;
+      if (advPattern === 'MorningStar') winRate += 12;
+      if (advPattern === 'EveningStar') winRate -= 12;
     } else if (position === 'short') {
-      if (advPattern === 'BearishEngulfing') winRate += 12;
-      if (advPattern === 'BullishEngulfing') winRate -= 12;
-      if (advPattern === 'EveningStar') winRate += 15;
-      if (advPattern === 'MorningStar') winRate -= 15;
+      if (advPattern === 'BearishEngulfing') winRate += 10;
+      if (advPattern === 'BullishEngulfing') winRate -= 10;
+      if (advPattern === 'EveningStar') winRate += 12;
+      if (advPattern === 'MorningStar') winRate -= 12;
     }
   }
 
   return {
     ema20,
     ema50,
-    macdHistogram: macdLast ? macdLast.histogram : null,
-    bbLower: bbLast ? bbLast.lower : null,
-    bbUpper: bbLast ? bbLast.upper : null,
-    winRate: Math.max(10, Math.min(90, winRate)),
+    macdHistogram: macdLast?.histogram ?? null,
+    bbLower: bbLast?.lower ?? null,
+    bbUpper: bbLast?.upper ?? null,
+    winRate: Math.max(10, Math.min(90, Math.round(winRate))),
   };
 }
+
 
 async function calcTechMultiTimeframes(symbol, position) {
   const [klines15m, klines1h, klines4h, klines1d] = await Promise.all([
@@ -651,15 +654,62 @@ async function calcTechMultiTimeframes(symbol, position) {
   const tech4h = calcTech(closes4h, position, klines4h.at(-1));
   const tech1d = calcTech(closes1d, position, klines1d.at(-1));
 
+  // Phân tích độ mạnh xu hướng khung 4h & 1d
+  const trendStrength4h = Math.abs((tech4h.ema20 - tech4h.ema50) / tech4h.ema50);
+  const trendStrength1d = Math.abs((tech1d.ema20 - tech1d.ema50) / tech1d.ema50);
+
+  // Mặc định
+  let weight15m = 0.30;
+  let weight1h = 0.40;
+  let weight4h = 0.20;
+  let weight1d = 0.10;
+
+  // Nếu trend trung hạn mạnh → ưu tiên hơn
+  if (trendStrength4h > 0.02) {
+    weight4h = 0.30;
+    weight15m = 0.20;
+    weight1h = 0.35;
+    weight1d = 0.15;
+  }
+
+  if (trendStrength1d > 0.03) {
+    weight1d = 0.20;
+    weight4h = 0.30;
+    weight1h = 0.30;
+    weight15m = 0.20;
+  }
+
+  // Chuẩn hóa trọng số nếu tổng > 1
+  const total = weight15m + weight1h + weight4h + weight1d;
+  weight15m /= total;
+  weight1h /= total;
+  weight4h /= total;
+  weight1d /= total;
+
   let winRate = (
-    tech15m.winRate * 0.30 +
-    tech1h.winRate * 0.40 +
-    tech4h.winRate * 0.20 +
-    tech1d.winRate * 0.10
+    tech15m.winRate * weight15m +
+    tech1h.winRate * weight1h +
+    tech4h.winRate * weight4h +
+    tech1d.winRate * weight1d
   );
 
-  return { winRate: Math.max(10, Math.min(90, winRate)) };
+  return {
+    winRate: Math.max(10, Math.min(90, Math.round(winRate))),
+    breakdown: {
+      '15m': tech15m.winRate,
+      '1h': tech1h.winRate,
+      '4h': tech4h.winRate,
+      '1d': tech1d.winRate,
+      weights: {
+        '15m': weight15m,
+        '1h': weight1h,
+        '4h': weight4h,
+        '1d': weight1d
+      }
+    }
+  };
 }
+
 
 
 
