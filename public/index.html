@@ -759,21 +759,7 @@ async function calcTechMultiTimeframes(symbol, position) {
   let weight4h = 0.20;
   let weight1d = 0.10;
 
-  // Nếu trend trung hạn mạnh → ưu tiên hơn
-  if (trendStrength4h > 0.02) {
-    weight4h = 0.30;
-    weight15m = 0.20;
-    weight1h = 0.35;
-    weight1d = 0.15;
-  }
-
-  if (trendStrength1d > 0.03) {
-    weight1d = 0.20;
-    weight4h = 0.30;
-    weight1h = 0.30;
-    weight15m = 0.20;
-  }
-
+  
   // Chuẩn hóa trọng số nếu tổng > 1
   const total = weight15m + weight1h + weight4h + weight1d;
   weight15m /= total;
